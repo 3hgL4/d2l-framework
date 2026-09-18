@@ -1,13 +1,9 @@
-"""Softmax 回归（FashionMNIST）· 从零实现，接入 infra 契约。
+"""softmax 回归从零实现（d2l 3.4-3.6）—— MiniSpec 声明式接入范例。
 
-模型/损失/优化器沿用 d2l 第 3 章从零实现写法：
-- 参数化: W 小随机初始化 + b 全 0（d2l 3.4 节），保留手写形式而非 nn.Linear；
-- 损失:   logsumexp 稳定交叉熵（d2l 3.6 节写法）；
-- 优化器: 手写 SGD（d2l 3.2 节），补了 state_dict/load_state_dict 以支持断点。
-
-注意 amp=False：手写 SGD 无 param_groups，GradScaler 需要 param_groups，
-因此本算法关闭混合精度（infra 对 nn 优化器无此限制）。
-原交互式预测展示保留在 softmax/softmax_scratch.py，此处专注训练流程。
+本文件演示"算法研究者只写算法，不写工程"：
+    写  log_softmax / 交叉熵 / 手写 W,b 的模型 / 数据集 / 指标 —— 全是算法知识；
+    不写 DataLoader 装配、batch 解包、指标聚合、断点续训、早停、曲线 —— infra 代劳。
+运行: python run.py --algo softmax
 """
 from __future__ import annotations
 
@@ -20,125 +16,120 @@ import torchvision
 import torchvision.transforms as transforms
 
 ROOT = Path(__file__).resolve().parents[2]   # d2l 项目根
-if str(ROOT) not in sys.path:                # 允许从任意位置 import 本模块
+if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from infra.data import make_loader
+from infra.callbacks import Callback
+from infra.minispec import MiniSpec
 
-DATA_ROOT = ROOT.parent / "data"             # 与既有脚本共用同一数据目录
+DATA_ROOT = ROOT.parent / "data"
 
 
 # ---------------------------------------------------------------------------
-# 从零实现部分（与 softmax_scratch.py 保持一致的写法）
+# ① 模型部分 1：softmax 的数值稳定实现（d2l 3.4.2，log-sum-exp 技巧）
+#    直接 exp 会溢出，先减去行最大值再归一化，最终以 log 概率形式输出
 # ---------------------------------------------------------------------------
-class SoftmaxScratch(nn.Module):
-    """y = X.reshape(n,-1) @ W + b，W/b 均为显式 Parameter。"""
+def log_softmax(X):
+    X_max = X.max(dim=1, keepdim=True).values
+    return X - X_max - (X - X_max).exp().sum(dim=1, keepdim=True).log()
 
-    def __init__(self, num_inputs: int = 784, num_outputs: int = 10,
-                 init_std: float = 0.01):
+
+# ---------------------------------------------------------------------------
+# ② 模型部分 2：从零交叉熵（d2l 3.4.3）
+#    y_hat 是 log 概率，取真实类别那一列的负 log 概率求均值（契约要求返回已 mean 标量）
+# ---------------------------------------------------------------------------
+def cross_entropy(y_hat, y):
+    return -y_hat[range(len(y_hat)), y].mean()
+
+
+# ---------------------------------------------------------------------------
+# ③ 模型部分 3：手写参数的 softmax 回归（d2l 3.4.1）
+#    W(784x10), b(10) 为 nn.Parameter 从零维护，不用 nn.Linear；
+#    forward = 展平 + 线性 + log_softmax。契约要求返回 nn.Module（infra 依赖
+#    其 parameters()/state_dict()/to(device)），从零实现也必须包成 Module
+# ---------------------------------------------------------------------------
+class SoftmaxRegressionScratch(nn.Module):
+    def __init__(self, num_inputs: int = 784, num_outputs: int = 10):
         super().__init__()
-        self.W = nn.Parameter(torch.normal(0, init_std, size=(num_inputs, num_outputs)))
+        self.W = nn.Parameter(torch.randn(num_inputs, num_outputs) * 0.01)
         self.b = nn.Parameter(torch.zeros(num_outputs))
 
     def forward(self, X):
-        return X.reshape((-1, self.W.shape[0])) @ self.W + self.b
+        return log_softmax(X.reshape((-1, self.W.shape[0])) @ self.W + self.b)
 
 
-def cross_entropy(logits, y):
-    """log-sumexp 稳定交叉熵，等价 -log softmax(logits)[y]（d2l 3.6 节）。"""
-    rows = torch.arange(len(logits), device=logits.device)
-    return -(logits[rows, y] - logits.logsumexp(dim=1)).mean()
+# ---------------------------------------------------------------------------
+# ④ 数据：FashionMNIST（d2l 3.5）。返回 (train_ds, val_ds) 即可，
+#    DataLoader 装配（batch_size/种子/pin_memory/workers）由 MiniSpec 代劳。
+#    归一化是算法决策点：d2l 原书仅 ToTensor；要加 Normalize 就改这一行
+# ---------------------------------------------------------------------------
+def load_data(cfg):
+    tfm = transforms.ToTensor()
+    ds = torchvision.datasets.FashionMNIST
+    return (ds(root=str(DATA_ROOT), train=True, download=False, transform=tfm),
+            ds(root=str(DATA_ROOT), train=False, download=False, transform=tfm))
 
 
+# ---------------------------------------------------------------------------
+# ⑤ 指标：准确率（d2l 3.4.4）。键名 "acc" 会出现在 history.csv 与 curves.png
+# ---------------------------------------------------------------------------
 def accuracy(y_hat, y):
-    if len(y_hat.shape) > 1 and y_hat.shape[1] > 1:
-        y_hat = y_hat.argmax(dim=1)
-    return (y_hat.type(y.dtype) == y).float().mean().item()
+    return (y_hat.argmax(dim=1) == y).float().mean().item()
 
 
-class SGDScratch:
-    """从零实现的小批量 SGD（d2l 3.2 节）+ 最小状态接口（支持断点续训）。"""
+# ---------------------------------------------------------------------------
+# ⑥ 算法专属可视化（可选扩展点）：预测对照图，绿=预测对，红=错，副行为真实标签。
+#    经 get_callbacks 注入，infra 完全不感知本算法（红线不破）
+# ---------------------------------------------------------------------------
+_CLASSES = ["t-shirt", "trouser", "pullover", "dress", "coat",
+            "sandal", "shirt", "sneaker", "bag", "ankle boot"]
 
-    def __init__(self, params, lr: float):
-        self.params, self.lr = list(params), lr
 
-    def step(self):
+class PredictionPlotter(Callback):
+    def __init__(self, n: int = 8):
+        self.n = n
+
+    def on_train_end(self, ctx):
+        import matplotlib.pyplot as plt
+
+        _, val_ds = load_data(ctx.cfg)
+        X = torch.stack([val_ds[i][0] for i in range(self.n)])
+        y = torch.tensor([int(val_ds[i][1]) for i in range(self.n)])
+        device = next(ctx.model.parameters()).device
         with torch.no_grad():
-            for p in self.params:
-                p -= self.lr * p.grad
-
-    def zero_grad(self):
-        for p in self.params:
-            if p.grad is not None:
-                p.grad.zero_()
-
-    def state_dict(self):
-        return {"lr": self.lr}
-
-    def load_state_dict(self, state):
-        self.lr = state["lr"]
+            pred = ctx.model(X.to(device)).argmax(dim=1).cpu()
+        cols = self.n // 2
+        fig, axes = plt.subplots(2, cols, figsize=(cols * 1.8, 4.4))
+        for ax, img, p, t in zip(axes.ravel(), X[:, 0], pred.tolist(), y.tolist()):
+            good = p == t
+            title = _CLASSES[p] if good else f"{_CLASSES[p]}\n[{_CLASSES[t]}]"
+            ax.imshow(img, cmap="gray")
+            ax.axis("off")
+            ax.set_title(title, fontsize=9,
+                         color="#0F6E56" if good else "#A32D2D")
+        fig.suptitle("predictions (green = correct, red = wrong)")
+        fig.tight_layout()
+        out = ctx.run_dir / "predictions.png"
+        fig.savefig(out, dpi=120, bbox_inches="tight")
+        plt.close(fig)
+        ctx.logger.info(f"[预测图] 已保存 {out.name}（绿=预测正确，红=错误，副行为真实标签）")
 
 
 # ---------------------------------------------------------------------------
-# 契约实现（infra 通过它注入本算法）
+# ⑦ 声明注册：MiniSpec 五组算法知识，其余全默认
+#    loss 直接赋函数、datasets 直接赋函数 —— 声明经类级读取，无需 staticmethod
 # ---------------------------------------------------------------------------
-class SoftmaxAlgo:
+class SoftmaxScratch(MiniSpec):
     name = "softmax"
-
-    def default_config(self):
-        return {"epochs": 50, "lr": 0.1, "batch_size": 256, "num_workers": 4,
-                "init_std": 0.01, "amp": False, "patience": 8,
-                "dataset": "FashionMNIST", "data_root": "",
-                "predict_demo": True, "predict_rows": 3}
-
-    def build_model(self, cfg):
-        return SoftmaxScratch(init_std=cfg.init_std)
-
-    def build_loss(self):
-        return cross_entropy
-
-    def build_optimizer(self, params, cfg):
-        return SGDScratch(params, lr=cfg.lr)
-
-    def build_dataloaders(self, cfg):
-        root = Path(cfg.data_root) if cfg.data_root else DATA_ROOT
-        tfm = transforms.ToTensor()  # [0,255] HWC uint8 -> [0,1] CHW float32
-        ds = getattr(torchvision.datasets, cfg.dataset)
-        train_ds = ds(root=str(root), train=True, download=False, transform=tfm)
-        test_ds = ds(root=str(root), train=False, download=False, transform=tfm)
-        return (make_loader(train_ds, cfg.batch_size, True, cfg.num_workers, seed=cfg.seed),
-                make_loader(test_ds, cfg.batch_size, False, cfg.num_workers))
-
-    def unpack_batch(self, batch):
-        return batch  # 模型内部自行 reshape
-
-    def compute_metrics(self, y_hat, y):
-        return {"acc": accuracy(y_hat, y)}
+    model = SoftmaxRegressionScratch
+    loss = cross_entropy
+    datasets = load_data
+    metrics = {"acc": accuracy}
+    optimizer = torch.optim.SGD            # lr 走 cfg.lr，--override lr=0.3 可调
+    config = {"epochs": 20, "lr": 0.1, "batch_size": 256, "patience": 5}
 
     def get_callbacks(self, cfg):
-        """算法专属回调：预测展示图（predictions.png）。经此注入，infra 零感知。"""
-        if not cfg.get("predict_demo", True):
-            return []
-        from .predict import PredictionPlotter
-        return [PredictionPlotter(dataset=cfg.dataset, rows=cfg.get("predict_rows", 3))]
+        return [PredictionPlotter()]
 
 
-SPEC = SoftmaxAlgo()
-
-
-if __name__ == "__main__":
-    # 直接运行本文件时的自检：合成数据走一遍前向/反向，不碰真实数据集。
-    # 完整训练请从项目根执行: python run.py --algo softmax
-    from infra.config import AttrDict
-    cfg = AttrDict(SPEC.default_config())
-    cfg["seed"] = 0
-    model = SPEC.build_model(cfg)
-    loss_fn = SPEC.build_loss()
-    opt = SPEC.build_optimizer(model.parameters(), cfg)
-    X = torch.randn(32, 1, 28, 28)
-    y = torch.randint(0, 10, (32,))
-    l = loss_fn(model(X), y)
-    l.backward()
-    opt.step()
-    print(f"self-check ok: model={type(model).__name__}, loss={l.item():.4f}")
-    print("训练请从项目根运行: python run.py --algo softmax")
+SPEC = SoftmaxScratch()

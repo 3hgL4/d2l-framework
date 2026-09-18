@@ -2,7 +2,7 @@
 
 《动手学深度学习》（d2l）自学用的**极简可复用训练框架**：算法与工程基础设施严格分离，让算法研究者**只写算法，不写工程**，每学一个新算法只新增一个算法目录，不触碰 infra 冻结面。
 
-接入验证：**fake**（声明式 MiniSpec）当前在库并通过全量冒烟；softmax / linreg 曾以完整契约接入验证过冻结面零改动（见 [CHANGELOG.md](CHANGELOG.md)），目录现由学习者自行重建练习。
+接入验证：**fake / softmax** 均以声明式 MiniSpec 在库并通过全量冒烟（1/2/3/4/5）；softmax 为从零实现范例（d2l 3.4-3.6，手写 W/b + 稳定 log-softmax + 从零交叉熵 + 预测图回调）。linreg 留给学习者按模板自行练习。
 
 健康度快照：fake 线性可分问题收敛正常，断点续训历史无缝衔接（冒烟 3 实测）。
 
@@ -33,6 +33,7 @@ d2l/
 │   └── data.py / evaluator.py / viz.py
 ├── algorithms/         # 算法层：每学一个算法新增一个目录
 │   ├── _template/      #   接入模板：复制 → 五处填空（纯算法）→ 运行
+│   ├── softmax/        #   softmax 从零实现（d2l 3.4-3.6，声明式范例 + 预测图回调）
 │   └── fake/           #   合成数据测试算法（声明式接入的活样例，冒烟用）
 ├── tests/              # 冒烟测试：种子/断点/全流程/声明式契约 + 红线检查
 └── runs/<algo>/<stamp>/  # 自动生成，含 ckpt 与全部产物（不入库）
@@ -42,8 +43,8 @@ d2l/
 
 ```bash
 # 依赖：Python 3.11+, PyTorch 2.x, torchvision, matplotlib, pyyaml
-python run.py --algo fake --override epochs=3 viz.live=False
-python run.py --algo fake --resume runs/fake/<stamp>/ckpt/last.pt --override epochs=6
+python run.py --algo softmax --override epochs=2 num_workers=0 viz.live=False
+python run.py --algo softmax --resume runs/softmax/<stamp>/ckpt/last.pt --override epochs=5
 
 # 验证框架健康（5 个冒烟测试；无显示器/CI 环境先 export MPLBACKEND=Agg）
 python tests/smoke_3_full_flow.py

@@ -109,7 +109,7 @@ python run.py --algo mlp --override epochs=3 num_workers=0
 python tests/smoke_1_seed_config.py            # 种子复现 / 配置合并 / 目录 / 日志
 python tests/smoke_2_history_ckpt_callbacks.py # 早停触发 / 断点状态等价
 python tests/smoke_3_full_flow.py              # 全流程 + spawn 多进程 + infra 红线检查
-python tests/smoke_4_softmax.py                # 真实算法接入 + 续训 + 预测图（需重建 algorithms/softmax 后可用）
+python tests/smoke_4_softmax.py                # 真实算法接入 + 续训 + 预测图（softmax 从零实现）
 python tests/smoke_5_minispec.py               # MiniSpec 声明式契约正确性（校验/配置/优化器/损失/装载）
 ```
 
