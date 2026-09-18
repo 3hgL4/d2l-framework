@@ -1,0 +1,13 @@
+# 训练产物（可再生，审计由 CHANGELOG.md 与 tests 承载）
+runs/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+# IDE / 系统
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
