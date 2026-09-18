@@ -28,3 +28,9 @@
 - 2026-09-18 | algorithms/softmax/：以 MiniSpec 声明式重建 softmax 从零实现（d2l 3.4-3.6：稳定 log-softmax + 从零交叉熵 + 手写 W/b + PredictionPlotter 回调） | 用户要求的声明式接入工作流范例；smoke_4 恢复全绿（2 轮 val_acc 0.804，续训/预测图断言全过）
 - 2026-09-18 | algorithms/_template/algo.py：升级为通用模板——固定六段骨架 + 算法家族差异速查表（分类/回归/手写损失）+ 回归/调度/解包/cfg组网变体注释 | 回答"任何 algo.py 结构是否一样"：一样，换算法只换 ②③④⑥ 内容
 - 2026-09-18 | algorithms/logreg_iris/：新增 logistic 回归（iris 二分类，手写 sigmoid + 从零 BCE，同一 random_state=666 split） | 机器学习课程第二次作业的框架侧对照实现，MiniSpec 第四个算法接入
+- 2026-09-18 | trainer.py：主循环新增可选契约 training_step(batch, ctx)（冻结面改动，已全量回归 smoke_1-6） | 算法全权接管单批优化（GAN/多优化器/梯度累积），infra 退化为聚合与回调；y_hat/y 为 None 时该批跳过指标
+- 2026-09-18 | callbacks.py：TrainContext 新增 device 字段，fit() 传入 | 兑现 training_step 契约"自管 batch 搬运（ctx.device）"；ctx 已有 model/optimizer/scaler，训练态经 ctx 拿回
+- 2026-09-18 | trainer.py：checkpoint 新增 contract_version 键，续训版本不一致显式告警（冻结面 checkpoint 语义扩展） | 契约可版本化：跨版本续训宁可吵不可静默错
+- 2026-09-18 | contract.py/minispec.py/README：training_step 契约语义成文 | 文档与实现同步，防漂移
+- 2026-09-18 | infra/__init__.py：版本 0.2.0 -> 0.3.0 | 上述冻结面扩展一并升版
+- 2026-09-18 | tests/smoke_6_custom_step.py：新增自定义步冒烟（10 项） | 手写 SGD 绕开 optimizer、跳指标分支、contract_version 落盘、续训保留自定义步、跨版本告警

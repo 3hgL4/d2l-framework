@@ -2,14 +2,14 @@
 
 《动手学深度学习》（d2l）自学用的**极简可复用训练框架**：算法与工程基础设施严格分离，让算法研究者**只写算法，不写工程**，每学一个新算法只新增一个算法目录，不触碰 infra 冻结面。
 
-接入验证：**fake / softmax** 均以声明式 MiniSpec 在库并通过全量冒烟（1/2/3/4/5）；softmax 为从零实现范例（d2l 3.4-3.6，手写 W/b + 稳定 log-softmax + 从零交叉熵 + 预测图回调）。linreg 留给学习者按模板自行练习。
+接入验证：**fake / softmax** 均以声明式 MiniSpec 在库并通过全量冒烟（1-6）；softmax 为从零实现范例（d2l 3.4-3.6，手写 W/b + 稳定 log-softmax + 从零交叉熵 + 预测图回调）。linreg 留给学习者按模板自行练习。
 
 健康度快照：fake 线性可分问题收敛正常，断点续训历史无缝衔接（冒烟 3 实测）。
 
 ## 设计理念
 
 1. **让算法研究者关注算法** —— 模型/损失/数据/指标是算法知识，必须写；DataLoader 装配/batch 解包/指标聚合/续训/早停是工程，一次写好后由框架代劳；
-2. **双层契约** —— `infra/minispec.py` 声明式基类（五处填空，约 30 行）覆盖 90% 场景；`infra/contract.py` 完整契约（AlgoSpec）留给全控场景。MiniSpec 是 AlgoSpec 的糖衣，唯一注入点不变；
+2. **双层契约** —— `infra/minispec.py` 声明式基类（五处填空，约 30 行）覆盖 90% 场景；`infra/contract.py` 完整契约（AlgoSpec）留给全控场景。MiniSpec 是 AlgoSpec 的糖衣，唯一注入点不变。逃生舱：可选 `training_step(batch, ctx)` 允许算法全权接管单批优化（GAN/多优化器/梯度累积），infra 退化为聚合与回调；
 3. **依赖倒置** —— infra 只依赖 contract.py 定义的 AlgoSpec 契约，绝不 import 任何算法（有静态检查兜底）；
 4. **决策归属分层** —— 归一化/指标/专属可视化是算法知识，走契约注入；训练循环/断点/早停/日志只写一次；
 5. **断点续训 = 状态等价** —— checkpoint 含优化器/RNG/extras 全状态；无法等价时显式告警并写元数据，绝不静默退化；
@@ -58,7 +58,7 @@ python tests/smoke_3_full_flow.py
 2. 五处填空（全是算法知识，约 30 行）：模型 nn.Module / 数据集构造 / 损失 / 指标 / 默认超参；
 3. `python run.py --algo <算法名>`。
 
-声明式声明：`name / model / loss / datasets` 必填，`optimizer / metrics / config / unpack / scheduler / get_callbacks` 可选（见 `infra/minispec.py`）。需要全部控制权（多优化器/非常规 batch/自定义装配）时，直接实现 AlgoSpec 完整契约：`default_config / build_model / build_loss / build_optimizer / build_dataloaders / unpack_batch / compute_metrics`（必选），`build_scheduler / get_callbacks`（可选）。
+声明式声明：`name / model / loss / datasets` 必填，`optimizer / metrics / config / unpack / scheduler / get_callbacks / training_step` 可选（见 `infra/minispec.py`）。需要全部控制权（多优化器/非常规 batch/自定义装配）时，直接实现 AlgoSpec 完整契约：`default_config / build_model / build_loss / build_optimizer / build_dataloaders / unpack_batch / compute_metrics`（必选），`build_scheduler / get_callbacks / training_step`（可选；自定义步经 `ctx.model / ctx.optimizer / ctx.device` 拿回训练态）。checkpoint 记录 `contract_version`（infra 版本），续训跨版本显式告警。
 
 ## Windows 兼容
 

@@ -20,6 +20,22 @@ infra 只依赖本文件描述的能力面，绝不反向 import 任何算法实
     get_callbacks(cfg) -> list[Callback]        算法专属回调（如预测展示图），
                                                 追加在默认回调之后执行
 
+    training_step(batch, ctx) -> (loss, y_hat, y)   完全接管单批优化（getattr
+                                                探测，不定义则走默认循环）。
+                                                算法自管 batch 搬运（ctx.device）、
+                                                forward、loss、backward、优化器
+                                                step（含是否用 ctx.scaler 做 AMP、
+                                                是否裁剪梯度），解锁 GAN / 多优化器 /
+                                                梯度累积等非标准循环；infra 仍负责
+                                                epoch/batch 循环、回调与聚合：
+                                                y_hat/y 均非 None 时指标按样本数
+                                                加权，否则该批跳过指标。loss 须为
+                                                已 reduce 的标量 tensor。验证路径
+                                                不受影响（仍走 build_loss/compute_metrics）。
+
+契约版本：infra.__version__ 随每次 checkpoint 落盘（"contract_version" 键），
+续训时版本不一致将显式告警；契约变更按"冻结面/边缘面"纪律记录于 CHANGELOG.md。
+
 声明式接入（推荐给算法学习者）：算法层可继承 infra.minispec.MiniSpec，只声明
 model/loss/datasets/metrics/config 等纯算法属性，适配器自动生成下述完整契约。
 本文件仍是唯一注入点——MiniSpec 产物同样通过 validate_spec；需要全部控制权

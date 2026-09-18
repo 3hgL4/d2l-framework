@@ -23,7 +23,7 @@ class TrainContext:
 
     def __init__(self, *, model, optimizer, scheduler, scaler, cfg, run_dir,
                  logger, history: History, extras: dict, spec_name: str,
-                 state_fn=None):
+                 state_fn=None, device=None):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -35,6 +35,7 @@ class TrainContext:
         self.extras = extras          # 跨回调/跨续训共享状态
         self.spec_name = spec_name
         self.state_fn = state_fn      # state_fn(epoch) -> checkpoint payload
+        self.device = device          # training_step 自定义步用它搬运 batch
         # 每 epoch 由 trainer 刷新
         self.epoch = 0
         self.epochs = 0

@@ -11,6 +11,7 @@ from pathlib import Path
 import torch
 
 from . import checkpoint as ckpt_mod
+from . import __version__ as infra_version
 from .callbacks import (BestTracker, Checkpointer, CurvePlotter,
                         EarlyStopping, HistoryLogger, TrainContext)
 from .contract import validate_spec
@@ -84,6 +85,7 @@ class Trainer:
     def _state_dict(self, epoch: int) -> dict:
         d = {
             "spec": self.spec.name,
+            "contract_version": infra_version,
             "epoch": epoch,
             "model": self.model.state_dict(),
             "optimizer": (self.optimizer.state_dict()
@@ -127,6 +129,10 @@ class Trainer:
             resume_epoch = payload["epoch"]
             extras = dict(payload.get("extras") or {})
             ckpt_mod.restore_rng(payload.get("rng"))
+            cv = payload.get("contract_version")
+            if cv is not None and cv != infra_version:
+                self.logger.warning(f"[续训] checkpoint 契约版本 {cv} ≠ 当前 "
+                                    f"{infra_version}，跨版本兼容未验证")
             self.logger.info(f"[续训] 从 epoch {resume_epoch} 恢复: {resume}")
         self.extras = extras
 
@@ -137,7 +143,7 @@ class Trainer:
             model=self.model, optimizer=self.optimizer, scheduler=self.scheduler,
             scaler=self.scaler, cfg=cfg, run_dir=self.run_dir, logger=self.logger,
             history=self.history, extras=extras, spec_name=spec.name,
-            state_fn=self._state_dict,
+            state_fn=self._state_dict, device=device,
         )
         ctx.epochs = cfg.epochs
 
@@ -187,26 +193,34 @@ class Trainer:
         self.model.train()
         n, loss_sum = 0, 0.0
         metric_sums: dict = {}
+        custom_step = getattr(spec, "training_step", None)
         amp_on = cfg.amp and self.device.type == "cuda"
         for i, batch in enumerate(loader):
-            X, y = spec.unpack_batch(batch)
-            X, y = X.to(self.device), y.to(self.device)
-            with torch.autocast(device_type=self.device.type, enabled=amp_on):
-                y_hat = self.model(X)
-                loss = self.loss_fn(y_hat, y)
-            self.optimizer.zero_grad()
-            self.scaler.scale(loss).backward()
-            if cfg.grad_clip > 0:
-                self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip)
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-
-            bs = y.shape[0] if hasattr(y, "shape") else len(y)
+            if custom_step is not None:
+                # 可选契约：算法全权接管单批优化（含 AMP/裁剪决策），infra 只聚合
+                loss, y_hat, y = custom_step(batch, ctx)
+                loss = loss if torch.is_tensor(loss) else torch.as_tensor(float(loss))
+                loss = loss.detach()
+                bs = int(y.shape[0]) if y is not None and hasattr(y, "shape") else 1
+            else:
+                X, y = spec.unpack_batch(batch)
+                X, y = X.to(self.device), y.to(self.device)
+                with torch.autocast(device_type=self.device.type, enabled=amp_on):
+                    y_hat = self.model(X)
+                    loss = self.loss_fn(y_hat, y)
+                self.optimizer.zero_grad()
+                self.scaler.scale(loss).backward()
+                if cfg.grad_clip > 0:
+                    self.scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.grad_clip)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                bs = y.shape[0] if hasattr(y, "shape") else len(y)
             loss_sum += float(loss) * bs
             n += bs
-            for k, v in (spec.compute_metrics(y_hat.detach().float(), y) or {}).items():
-                metric_sums[k] = metric_sums.get(k, 0.0) + float(v) * bs
+            if y_hat is not None and y is not None:
+                for k, v in (spec.compute_metrics(y_hat.detach().float(), y) or {}).items():
+                    metric_sums[k] = metric_sums.get(k, 0.0) + float(v) * bs
             if cfg.verbose:
                 ctx.logger.debug(f"  epoch {ctx.epoch} batch {i} loss {float(loss):.4f}")
             for cb in cbs:

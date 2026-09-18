@@ -36,6 +36,10 @@ optimizer 三种写法：
     unpack = fn(batch) -> (X, y)          batch 非 (X, y) 形式时声明
     scheduler = fn(optimizer, cfg)        按 epoch 步进的学习率调度
     get_callbacks(self, cfg)              算法专属回调（追加在默认回调之后）
+    training_step(self, batch, ctx)       全权接管单批优化 -> (loss, y_hat, y)，
+                                          用于 GAN/多优化器/梯度累积等非标准循环
+                                          （y_hat/y 给 None 则该批跳过指标聚合；
+                                          ctx.device 供 batch 搬运）
 
 本类是 contract.AlgoSpec 的声明式糖衣：实例自动满足完整契约并通过
 validate_spec；trainer/checkpoint/callbacks 等冻结面对此无感知 —— 本模块
