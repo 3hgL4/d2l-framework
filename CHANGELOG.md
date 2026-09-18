@@ -34,3 +34,8 @@
 - 2026-09-18 | contract.py/minispec.py/README：training_step 契约语义成文 | 文档与实现同步，防漂移
 - 2026-09-18 | infra/__init__.py：版本 0.2.0 -> 0.3.0 | 上述冻结面扩展一并升版
 - 2026-09-18 | tests/smoke_6_custom_step.py：新增自定义步冒烟（10 项） | 手写 SGD 绕开 optimizer、跳指标分支、contract_version 落盘、续训保留自定义步、跨版本告警
+- 2026-09-18 | trainer.py：单批 float(loss) 只算一次并复用；batch 搬运加 non_blocking=True（冻结面，已全量回归 smoke_1-6） | 重复 .item() 即重复 D2H 同步；pin_memory 的异步拷贝此前从未兑现（实测 softmax 负载 2.27 -> 2.10 ms/batch）
+- 2026-09-18 | evaluator.py：@torch.no_grad() -> @torch.inference_mode()；autocast 提到循环外；batch 搬运加 non_blocking=True（已全量回归） | 验证输出从不进 autograd，语义等价；省每批上下文进出与同步拷贝
+- 2026-09-18 | callbacks.py：Checkpointer 每轮只组装一次 checkpoint payload | is_best 轮此前 capture_rng + torch.save 各执行两次；同轮 last/best 内容严格一致反而更正确
+- 2026-09-18 | data.py：make_loader 新增可选 pin_memory 参数，make_dataloaders 按目标设备判断（device=cpu 不再分配锁页内存） | 锁页内存在 cpu 路径只有开销；参数缺省保持旧行为
+- 2026-09-18 | algorithms/softmax/algo.py：load_data 一次性预转换 TensorDataset（等价 ToTensor，含 (N,1,28,28) 形状）；config 增加 amp=False（均算法层，infra 零改动） | ToTensor 逐样本转换每 epoch 重复执行，实测 5.9s -> 0.5s（12x）；784x10 小模型 AMP 为负收益（实测 -23%），大模型章节可删

@@ -143,10 +143,15 @@ class Checkpointer(Callback):
     def on_epoch_end(self, ctx):
         if ctx.state_fn is None:
             return
+        if not (self.save_last or (self.save_best and ctx.is_best)):
+            return
+        # 组装一次 payload：is_best 轮省一次 RNG 捕获同步 + 一份序列化，
+        # 且同轮 last/best 内容严格一致（此前两次组装的 RNG 快照本就有微差）
+        payload = ctx.state_fn(ctx.epoch)
         if self.save_last:
-            ckpt_mod.save(ctx.run_dir / "ckpt" / "last.pt", ctx.state_fn(ctx.epoch))
+            ckpt_mod.save(ctx.run_dir / "ckpt" / "last.pt", payload)
         if self.save_best and ctx.is_best:
-            ckpt_mod.save(ctx.run_dir / "ckpt" / "best.pt", ctx.state_fn(ctx.epoch))
+            ckpt_mod.save(ctx.run_dir / "ckpt" / "best.pt", payload)
 
 
 class CurvePlotter(Callback):

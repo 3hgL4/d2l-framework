@@ -204,7 +204,8 @@ class Trainer:
                 bs = int(y.shape[0]) if y is not None and hasattr(y, "shape") else 1
             else:
                 X, y = spec.unpack_batch(batch)
-                X, y = X.to(self.device), y.to(self.device)
+                # non_blocking：pin_memory 批次走异步 H2D（非 pinned 时等价同步，无害）
+                X, y = X.to(self.device, non_blocking=True), y.to(self.device, non_blocking=True)
                 with torch.autocast(device_type=self.device.type, enabled=amp_on):
                     y_hat = self.model(X)
                     loss = self.loss_fn(y_hat, y)
@@ -216,15 +217,16 @@ class Trainer:
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
                 bs = y.shape[0] if hasattr(y, "shape") else len(y)
-            loss_sum += float(loss) * bs
+            loss_val = float(loss)  # 每批仅此一次 D2H 同步，下文复用（重复 .item() 即重复同步）
+            loss_sum += loss_val * bs
             n += bs
             if y_hat is not None and y is not None:
                 for k, v in (spec.compute_metrics(y_hat.detach().float(), y) or {}).items():
                     metric_sums[k] = metric_sums.get(k, 0.0) + float(v) * bs
             if cfg.verbose:
-                ctx.logger.debug(f"  epoch {ctx.epoch} batch {i} loss {float(loss):.4f}")
+                ctx.logger.debug(f"  epoch {ctx.epoch} batch {i} loss {loss_val:.4f}")
             for cb in cbs:
-                cb.on_batch_end(ctx, i, float(loss))
+                cb.on_batch_end(ctx, i, loss_val)
         return loss_sum / max(n, 1), {k: s / max(n, 1) for k, s in metric_sums.items()}
 
     def _log_epoch(self, ctx, val_out):

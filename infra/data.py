@@ -13,19 +13,29 @@ from torch.utils.data import DataLoader
 
 
 def make_loader(dataset, batch_size: int, shuffle: bool, num_workers: int = 0,
-                drop_last: bool = False, seed: int | None = None) -> DataLoader:
+                drop_last: bool = False, seed: int | None = None,
+                pin_memory: bool | None = None) -> DataLoader:
     g = None
     if seed is not None:
         g = torch.Generator()
         g.manual_seed(int(seed))
+    if pin_memory is None:  # 未指定时保持旧行为：按 CUDA 可用性
+        pin_memory = torch.cuda.is_available()
     return DataLoader(
         dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last,
-        num_workers=num_workers, pin_memory=torch.cuda.is_available(),
+        num_workers=num_workers, pin_memory=pin_memory,
         persistent_workers=num_workers > 0, generator=g,
     )
 
 
 def make_dataloaders(train_ds, val_ds, cfg) -> tuple[DataLoader, DataLoader]:
-    """按全局配置批量构造 (train_loader, val_loader)。"""
-    return (make_loader(train_ds, cfg.batch_size, True, cfg.num_workers, seed=cfg.seed),
-            make_loader(val_ds, cfg.batch_size, False, cfg.num_workers))
+    """按全局配置批量构造 (train_loader, val_loader)。
+
+    pin_memory 仅在目标设备为 CUDA 时开启：device=cpu 下锁页内存只有分配
+    开销（trainer/evaluator 的 non_blocking 拷贝以 pin 为前提）。
+    """
+    pin = torch.cuda.is_available() and str(cfg.get("device", "auto")).lower() != "cpu"
+    return (make_loader(train_ds, cfg.batch_size, True, cfg.num_workers,
+                        seed=cfg.seed, pin_memory=pin),
+            make_loader(val_ds, cfg.batch_size, False, cfg.num_workers,
+                        pin_memory=pin))
