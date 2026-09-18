@@ -152,10 +152,13 @@ class CurvePlotter(Callback):
     """训练曲线：epoch 级实时刷新（可选），训练结束存盘。样式经 style 注入。
 
     style: dict -> rcParams 更新；callable(fig, ax) -> 完全自定义（见 viz.py）。
+    wait_close=True 时训练结束后窗口保持打开，由用户手动关闭（Agg 下自动失效）。
     """
 
-    def __init__(self, live: bool = True, save: bool = True, style=None):
+    def __init__(self, live: bool = True, save: bool = True, style=None,
+                 wait_close: bool = False):
         self.live, self.save, self.style = live, save, style
+        self.wait_close = wait_close
         self._plot = None
 
     def on_train_start(self, ctx):
@@ -174,5 +177,7 @@ class CurvePlotter(Callback):
             return
         if self.save:
             self._plot.save()
+        if self.wait_close:
+            self._plot.wait_for_close()  # 用户手动关窗后才会继续/退出
         self._plot.close()
         self._plot = None

@@ -31,8 +31,11 @@ python run.py --algo softmax --resume runs/softmax/<stamp>/ckpt/last.pt --overri
 ## 3. 可视化控制
 
 ```bash
-# 训练结束后曲线窗口保持打开，由你手动关闭（默认自动关）
-python run.py --algo softmax --override viz.wait_close=True
+# 训练结束后曲线窗口保持打开，由你手动关闭（默认行为）
+python run.py --algo softmax
+
+# 脚本/批处理场景恢复"结束自动关窗退出"
+python run.py --algo softmax --override viz.wait_close=False
 
 # 关闭实时刷新窗口（只存 curves.png 到 run 目录）
 python run.py --algo softmax --override viz.live=False
@@ -131,5 +134,5 @@ runs/<算法>/<时间戳>/
 | monitor / mode / patience / min_delta | val_loss / min / 0 / 0 | 早停策略（patience=0 关闭） |
 | grad_clip | 0 | 梯度范数裁剪阈值 |
 | log_every / verbose | 1 / False | 摘要行频率 / batch 级细节 |
-| viz.live / viz.save / viz.wait_close | True / True / False | 实时窗口 / 存盘 / 结束后等手动关窗 |
+| viz.live / viz.save / viz.wait_close | True / True / True | 实时窗口 / 存盘 / 结束后等手动关窗（False=自动退出） |
 | ckpt.save_last / ckpt.save_best | True / True | 断点保存 |

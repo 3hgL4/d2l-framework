@@ -14,3 +14,5 @@
 - 2026-09-18 | 新增本 CHANGELOG | 让冻结纪律可审计，不依赖记忆
 - 2026-09-18 | trainer.py：续训退化时 extras 写入 resumed_degraded_optimizer，随 checkpoint 落盘 | 告警只进日志，元数据进状态才可机器审计
 - 2026-09-18 | contract.py：注明 build_model 必须返回 nn.Module | infra 靠 parameters()/state_dict()/to(device) 枚举张量，显式成文防误用
+- 2026-09-18 | viz/callbacks/trainer/config：新增 viz.wait_close（默认 False） | 训练结束不再强制关窗，用户可 --override viz.wait_close=True 手动关图
+- 2026-09-18 | config.py：viz.wait_close 默认值 False -> True | 用户交互式使用为主，手动关窗应为默认；脚本场景显式传 False

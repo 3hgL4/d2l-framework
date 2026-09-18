@@ -37,8 +37,9 @@ INFRA_DEFAULTS: dict = {
     "min_delta": 0.0,
     # 记录
     "verbose": False,         # True 时记录 batch 级细节（仅进文件）
-    # 可视化
-    "viz": {"live": True, "save": True},
+    # 可视化（wait_close：训练结束后窗口保持打开，由用户手动关闭；
+    # 脚本/CI 场景可 --override viz.wait_close=False 恢复自动退出）
+    "viz": {"live": True, "save": True, "wait_close": True},
     # 断点
     "ckpt": {"save_last": True, "save_best": True},
 }

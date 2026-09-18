@@ -65,7 +65,8 @@ class Trainer:
         ]
         if cfg.patience > 0:
             cbs.append(EarlyStopping(cfg.monitor, cfg.mode, cfg.patience, cfg.min_delta))
-        cbs.append(CurvePlotter(live=cfg.viz.live, save=cfg.viz.save))
+        cbs.append(CurvePlotter(live=cfg.viz.live, save=cfg.viz.save,
+                                wait_close=cfg.viz.get("wait_close", False)))
         cbs.append(Checkpointer(cfg.ckpt.save_last, cfg.ckpt.save_best))
         return cbs
 

@@ -66,3 +66,9 @@ class CurvePlot:
     def close(self) -> None:
         plt.ioff()
         plt.close(self.fig)
+
+    def wait_for_close(self) -> None:
+        """阻塞直到用户手动关闭窗口（Agg 后端无窗口，立即返回）。"""
+        if self.live:
+            plt.ioff()
+            plt.show(block=True)
