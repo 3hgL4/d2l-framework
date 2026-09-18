@@ -26,3 +26,4 @@
 - 2026-09-18 | tests/smoke_5_minispec.py：新增 MiniSpec 适配器冒烟（11 项） | 声明校验/配置合成/优化器三形态/损失三形态/装载/聚合/unpack/scheduler/callbacks 全覆盖
 - 2026-09-18 | README/USAGE：双层契约说明 + 目录树同步磁盘实际（softmax/linreg 已删） | 修正文档漂移；smoke_4 标注需重建 softmax 后可用
 - 2026-09-18 | algorithms/softmax/：以 MiniSpec 声明式重建 softmax 从零实现（d2l 3.4-3.6：稳定 log-softmax + 从零交叉熵 + 手写 W/b + PredictionPlotter 回调） | 用户要求的声明式接入工作流范例；smoke_4 恢复全绿（2 轮 val_acc 0.804，续训/预测图断言全过）
+- 2026-09-18 | algorithms/_template/algo.py：升级为通用模板——固定六段骨架 + 算法家族差异速查表（分类/回归/手写损失）+ 回归/调度/解包/cfg组网变体注释 | 回答"任何 algo.py 结构是否一样"：一样，换算法只换 ②③④⑥ 内容
