@@ -2,6 +2,10 @@
 
 不依赖任何真实数据集； FakeDataset 固定生成规则（模块级类，可 pickle，
 num_workers>0 的 Windows spawn 路径也可验证）。
+
+本文件同时是 MiniSpec 声明式接入的活样例：只声明 model/loss/datasets/
+metrics/config 五组算法知识，经 infra.minispec 适配成完整 AlgoSpec 契约
+—— 冒烟 2/3 因此同时回归"声明式接入"与"infra 冻结面"。
 """
 from __future__ import annotations
 
@@ -10,7 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-from infra.data import make_dataloaders
+from infra.minispec import MiniSpec
 
 
 class FakeDataset(Dataset):
@@ -39,29 +43,22 @@ class FakeNet(nn.Module):
         return self.fc(X)
 
 
-class FakeAlgo:
+def _acc(y_hat, y):
+    return (y_hat.argmax(1) == y).float().mean().item()
+
+
+def _load_data(cfg):
+    return FakeDataset(seed=0), FakeDataset(n=512, seed=1)
+
+
+class FakeAlgo(MiniSpec):
     name = "fake"
-
-    def default_config(self):
-        return {"epochs": 12, "lr": 0.1, "batch_size": 128, "patience": 0}
-
-    def build_model(self, cfg):
-        return FakeNet()
-
-    def build_loss(self):
-        return F.cross_entropy
-
-    def build_optimizer(self, params, cfg):
-        return torch.optim.SGD(params, lr=cfg.lr)
-
-    def build_dataloaders(self, cfg):
-        return make_dataloaders(FakeDataset(seed=0), FakeDataset(n=512, seed=1), cfg)
-
-    def unpack_batch(self, batch):
-        return batch
-
-    def compute_metrics(self, y_hat, y):
-        return {"acc": (y_hat.argmax(1) == y).float().mean().item()}
+    model = FakeNet
+    loss = F.cross_entropy
+    datasets = _load_data
+    optimizer = torch.optim.SGD      # lr 走 cfg.lr（默认 0.1，--override 可调）
+    metrics = {"acc": _acc}
+    config = {"epochs": 12, "patience": 0}
 
 
 SPEC = FakeAlgo()

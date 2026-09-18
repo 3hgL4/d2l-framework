@@ -10,9 +10,10 @@
   checkpoint  断点全状态（权重/优化器/RNG/extras）
   callbacks   生命周期钩子与内置回调（早停/最佳追踪/存档/曲线）
   contract    算法契约（AlgoSpec Protocol，唯一注入点）
+  minispec    声明式算法基类（AlgoSpec 糖衣：只声明算法知识，工程代劳）
   data        DataLoader 工厂（Windows 多进程安全）
   evaluator   验证集评估执行器
   viz         训练曲线实时刷新与存盘
   trainer     通用训练循环
 """
-__version__ = "0.1.0"
+__version__ = "0.2.0"

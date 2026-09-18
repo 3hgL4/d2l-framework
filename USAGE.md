@@ -43,8 +43,8 @@ python run.py --algo softmax --override viz.live=False
 # 连存盘也关（更快，无任何图）
 python run.py --algo softmax --override viz.live=False viz.save=False
 
-# 关闭算法专属预测图（softmax 的 predictions.png）
-python run.py --algo softmax --override predict_demo=False
+# 关闭算法专属可视化回调（如自定义预测图，按算法自身配置键而定）
+python run.py --algo mlp --override predict_demo=False
 ```
 
 ## 4. 可复现 / 设备 / 性能
@@ -82,21 +82,25 @@ python run.py --algo softmax --override verbose=True
 python run.py --algo softmax --override log_every=5
 ```
 
-## 6. 接入新算法（三步，infra 零改动）
+## 6. 接入新算法（三步，infra 零改动，只填算法）
 
 ```bash
 # 1. 复制模板目录并改名（目录名即 --algo 的值）
 #    algorithms/_template/  ->  algorithms/mlp/
-# 2. 替换 algo.py 里的 TODO（模型/损失/优化器/数据/指标），末尾保留 SPEC = XxxAlgo()
+# 2. 五处填空（全是算法知识，约 30 行）：
+#    模型 nn.Module / 数据集构造 load_data / 损失 loss / 指标 metrics / 默认超参 config
+#    声明式基类见 infra/minispec.py；优化器 optimizer 可选（默认 SGD，lr 走 --override）
 # 3. 运行（先小轮数验证，再正式训练）
 python run.py --algo mlp --override epochs=3 num_workers=0
 ```
 
-## 7. 单文件自检（不训练，不碰数据集）
+## 7. 进阶：完整契约接入（需要全部控制权时）
 
 ```bash
-# 在任意目录直接运行 algo.py：合成数据走一遍前向/反向，验证代码能跑
-python algorithms/softmax/algo.py
+# MiniSpec 不够用时（多优化器 / 非常规 batch / 自定义装配逻辑），
+# 直接实现 contract.AlgoSpec：default_config / build_model / build_loss /
+# build_optimizer / build_dataloaders / unpack_batch / compute_metrics 必选，
+# build_scheduler / get_callbacks 可选，duck-typing 无需继承（见 infra/contract.py）
 ```
 
 ## 8. 冒烟测试（全量回归，改 infra 后必跑）
@@ -105,7 +109,8 @@ python algorithms/softmax/algo.py
 python tests/smoke_1_seed_config.py            # 种子复现 / 配置合并 / 目录 / 日志
 python tests/smoke_2_history_ckpt_callbacks.py # 早停触发 / 断点状态等价
 python tests/smoke_3_full_flow.py              # 全流程 + spawn 多进程 + infra 红线检查
-python tests/smoke_4_softmax.py                # 真实算法接入 + 续训 + 预测图
+python tests/smoke_4_softmax.py                # 真实算法接入 + 续训 + 预测图（需重建 algorithms/softmax 后可用）
+python tests/smoke_5_minispec.py               # MiniSpec 声明式契约正确性（校验/配置/优化器/损失/装载）
 ```
 
 ## 9. 产物说明（每次运行自动生成）
@@ -117,7 +122,7 @@ runs/<算法>/<时间戳>/
 ├── train.log       # 双写日志（控制台+文件，utf-8）
 ├── history.csv     # 逐 epoch 训练历史（曲线图的数据源）
 ├── curves.png      # 全指标曲线（轮数/损失/各准确率）
-├── predictions.png # 预测展示图（softmax 专属回调，绿对红错）
+├── predictions.png # 预测展示图（算法层回调产物，如有）
 └── ckpt/
     ├── last.pt     # 最新断点（--resume 用它）
     └── best.pt     # 最优轮断点（预测图默认用它）
@@ -129,7 +134,7 @@ runs/<算法>/<时间戳>/
 |---|---|---|
 | seed / deterministic | 42 / False | 种子与 cudnn 确定性 |
 | device / amp | auto / True | 设备与混合精度（手写优化器须 amp=False） |
-| epochs / lr / batch_size | 10 / 各算法定 | 训练轮数与算法超参 |
+| epochs / lr / batch_size | 10 / 0.1 / 128 | 轮数（infra 默认）；lr/batch_size 为 MiniSpec 声明默认，可在 config 声明中覆盖 |
 | num_workers | 0 | DataLoader 进程数（Windows 建议 0 或 4） |
 | monitor / mode / patience / min_delta | val_loss / min / 0 / 0 | 早停策略（patience=0 关闭） |
 | grad_clip | 0 | 梯度范数裁剪阈值 |

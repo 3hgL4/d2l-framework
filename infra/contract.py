@@ -20,6 +20,11 @@ infra 只依赖本文件描述的能力面，绝不反向 import 任何算法实
     get_callbacks(cfg) -> list[Callback]        算法专属回调（如预测展示图），
                                                 追加在默认回调之后执行
 
+声明式接入（推荐给算法学习者）：算法层可继承 infra.minispec.MiniSpec，只声明
+model/loss/datasets/metrics/config 等纯算法属性，适配器自动生成下述完整契约。
+本文件仍是唯一注入点——MiniSpec 产物同样通过 validate_spec；需要全部控制权
+（多优化器/非常规 batch/自定义装配）时直接实现本契约。
+
 优化器序列化协议（断点续训的正确性前提）：
     自定义优化器必须实现 state_dict()/load_state_dict()；
     缺失时 trainer 退化为仅恢复 lr 并显式告警——若优化器含可变状态

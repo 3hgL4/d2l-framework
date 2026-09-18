@@ -18,3 +18,10 @@
 - 2026-09-18 | config.py：viz.wait_close 默认值 False -> True | 用户交互式使用为主，手动关窗应为默认；脚本场景显式传 False
 - 2026-09-18 | config.py/run.py/tests：env.txt -> env.json（机器可读） | 与 config.yaml 同格式，两次实验环境可直接 diff
 - 2026-09-18 | README.md：统一"核心冻结"措辞、补测试命令/runs 树项/健康度快照 | 消除"零改动"残留话术与变更纪律的自相矛盾（外部评审发现）
+- 2026-09-18 | infra/minispec.py：新增 MiniSpec 声明式算法基类（边缘面，新增模块，冻结面零改动） | 让算法研究者只写算法（模型/损失/数据/指标/超参），DataLoader 装配/batch 解包/指标聚合等工程由适配器代劳
+- 2026-09-18 | tests/fake_algo.py：FakeAlgo 由手写契约改为 MiniSpec 声明式（行为等价） | 冒烟 2/3 升级为声明式接入的回归验证；声明错误在类定义时报错
+- 2026-09-18 | algorithms/_template/algo.py：模板改写为 MiniSpec 五处填空（约 100 行 -> 30 行算法代码） | 新算法接入的工程代码量降为零，工程知识不再出现在算法文件
+- 2026-09-18 | contract.py：docstring 注明 MiniSpec 声明式入口 | 唯一注入点不变，文档与实际接入方式一致
+- 2026-09-18 | infra/__init__.py：模块清单加 minispec，版本 0.1.0 -> 0.2.0 | 新增边缘面能力，向后兼容
+- 2026-09-18 | tests/smoke_5_minispec.py：新增 MiniSpec 适配器冒烟（11 项） | 声明校验/配置合成/优化器三形态/损失三形态/装载/聚合/unpack/scheduler/callbacks 全覆盖
+- 2026-09-18 | README/USAGE：双层契约说明 + 目录树同步磁盘实际（softmax/linreg 已删） | 修正文档漂移；smoke_4 标注需重建 softmax 后可用
