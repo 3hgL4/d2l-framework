@@ -51,7 +51,7 @@ def main(argv=None):
         run_dir = new_run_dir(args.runs_root, args.algo)
         logger = get_logger(run_dir / "train.log")
 
-    snapshot_env(run_dir / "env.txt")
+    snapshot_env(run_dir / "env.json")
     save_config(cfg, run_dir / "config.yaml")
     logger.info(f"[配置] epochs={cfg.epochs} seed={cfg.seed} device={cfg.device} "
                 f"amp={cfg.amp} workers={cfg.num_workers} patience={cfg.patience}")

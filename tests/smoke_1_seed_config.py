@@ -53,9 +53,10 @@ def main():
     save_config(cfg, rd / "config.yaml")
     back = yaml.safe_load((rd / "config.yaml").read_text(encoding="utf-8"))
     check("config.yaml 落盘可回读", back["epochs"] == 30 and back["lr"] == 0.9)
-    snapshot_env(rd / "env.txt")
-    txt = (rd / "env.txt").read_text(encoding="utf-8")
-    check("env.txt 含 torch/GPU 信息", "torch = " in txt and "cuda_available" in txt)
+    snapshot_env(rd / "env.json")
+    import json as _json
+    env = _json.loads((rd / "env.json").read_text(encoding="utf-8"))
+    check("env.json 机器可读且含 torch/GPU", "torch" in env and "cuda_available" in env)
 
     # 4. 日志双写（含中文）
     log = get_logger(rd / "train.log")

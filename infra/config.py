@@ -146,25 +146,33 @@ def new_run_dir(runs_root, algo: str) -> Path:
 
 
 def snapshot_env(path, extra: dict | None = None) -> None:
-    """环境快照 -> env.txt（可复现三件套之一）。"""
-    lines = [f"time = {time.strftime('%Y-%m-%d %H:%M:%S')}"]
-    lines.append(f"python = {sys.version.split()[0]} ({sys.executable})")
-    lines.append(f"os = {platform.platform()}")
+    """环境快照 -> env.json（可复现三件套之一）。
+
+    JSON 而非 txt：与 config.yaml 同为机器可读格式，两次实验环境可直接 diff。
+    """
+    import json
+
+    info = {
+        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "python": f"{sys.version.split()[0]} ({sys.executable})",
+        "os": platform.platform(),
+    }
     try:
         import torch
-        lines.append(f"torch = {torch.__version__}")
-        lines.append(f"cuda_available = {torch.cuda.is_available()}")
+        info["torch"] = torch.__version__
+        info["cuda_available"] = torch.cuda.is_available()
         if torch.cuda.is_available():
-            lines.append(f"gpu = {torch.cuda.get_device_name(0)}")
-            lines.append(f"cudnn = {torch.backends.cudnn.version()}")
+            info["gpu"] = torch.cuda.get_device_name(0)
+            info["cudnn"] = torch.backends.cudnn.version()
     except ImportError:
-        lines.append("torch = 未安装")
+        info["torch"] = None
     for mod in ("numpy", "torchvision", "matplotlib"):
         try:
             m = __import__(mod)
-            lines.append(f"{mod} = {getattr(m, '__version__', '?')}")
+            info[mod] = getattr(m, "__version__", "?")
         except ImportError:
             pass
-    for k, v in (extra or {}).items():
-        lines.append(f"{k} = {v}")
-    Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    info.update(extra or {})
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

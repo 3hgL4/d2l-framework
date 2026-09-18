@@ -51,7 +51,7 @@ def main():
     run_dirs = sorted((tmp / "fake").iterdir())
     check("run 目录已创建", len(run_dirs) == 1)
     rd = run_dirs[0]
-    for f in ("config.yaml", "env.txt", "train.log", "history.csv", "curves.png",
+    for f in ("config.yaml", "env.json", "train.log", "history.csv", "curves.png",
               "ckpt/last.pt", "ckpt/best.pt"):
         check(f"产物 {f} 存在", (rd / f).exists())
 

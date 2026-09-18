@@ -113,7 +113,7 @@ python tests/smoke_4_softmax.py                # 真实算法接入 + 续训 + �
 ```text
 runs/<算法>/<时间戳>/
 ├── config.yaml     # 最终生效配置（三层合并结果，存档1）
-├── env.txt         # 环境/版本/GPU 快照（存档2）
+├── env.json        # 环境/版本/GPU 快照（存档2，机器可读可 diff）
 ├── train.log       # 双写日志（控制台+文件，utf-8）
 ├── history.csv     # 逐 epoch 训练历史（曲线图的数据源）
 ├── curves.png      # 全指标曲线（轮数/损失/各准确率）

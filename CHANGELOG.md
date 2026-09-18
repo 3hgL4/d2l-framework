@@ -16,3 +16,5 @@
 - 2026-09-18 | contract.py：注明 build_model 必须返回 nn.Module | infra 靠 parameters()/state_dict()/to(device) 枚举张量，显式成文防误用
 - 2026-09-18 | viz/callbacks/trainer/config：新增 viz.wait_close（默认 False） | 训练结束不再强制关窗，用户可 --override viz.wait_close=True 手动关图
 - 2026-09-18 | config.py：viz.wait_close 默认值 False -> True | 用户交互式使用为主，手动关窗应为默认；脚本场景显式传 False
+- 2026-09-18 | config.py/run.py/tests：env.txt -> env.json（机器可读） | 与 config.yaml 同格式，两次实验环境可直接 diff
+- 2026-09-18 | README.md：统一"核心冻结"措辞、补测试命令/runs 树项/健康度快照 | 消除"零改动"残留话术与变更纪律的自相矛盾（外部评审发现）
