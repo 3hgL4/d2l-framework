@@ -209,41 +209,68 @@ def make_run_report(algo: str, stamp: str) -> Path:
 
 
 def make_compare_report(algo: str, stamps: list[str]) -> Path:
-    rows_out = []
+    # 收集每个 run 的展平配置 + 指标
+    entries = []
     for s in sorted(stamps):
         d = run_paths(algo, s)
         cols, rows = load_history(d / "history.csv")
         if not rows:
             continue
-        cfg = load_config_from_log(d / "train.log")
+        cfg = flatten(load_config_from_log(d / "train.log"))
         final = rows[-1]
         bl = min(float(r["val_loss"]) for r in rows) if "val_loss" in cols else float("nan")
         ba = max(float(r["val_acc"]) for r in rows) if "val_acc" in cols else float("nan")
         fl = float(final.get("val_loss", "nan"))
         fa = float(final.get("val_acc", "nan"))
         ts = sum(float(r.get("train_time_s") or 0) for r in rows)
-        rows_out.append({
-            "run": s, "lr": cfg.get("lr", "?"), "batch": cfg.get("batch_size", "?"),
-            "epochs": len(rows), "final_val_loss": fl, "final_val_acc": fa,
+        entries.append({
+            "run": s, "cfg": cfg, "epochs": len(rows),
+            "final_val_loss": fl, "final_val_acc": fa,
             "best_val_loss": bl, "best_val_acc": ba, "time_s": round(ts, 1),
         })
-    if not rows_out:
+    if not entries:
         sys.exit(f"[错误] {algo} 没有可对比的 run")
 
-    valid = [r for r in rows_out if r["best_val_loss"] == r["best_val_loss"]]
-    best_stamp = min(valid, key=lambda r: r["best_val_loss"])["run"] if valid else None
+    # 动态挑列：所有 run 里取值有差异的配置键（差异原因候选），epoch 类后置
+    all_keys: list[str] = []
+    for e in entries:
+        for k in e["cfg"]:
+            if k not in all_keys:
+                all_keys.append(k)
+    varying = [k for k in all_keys
+               if k != "epochs"  # epochs 已在指标列，配置里的必然相同
+               and len({repr(e["cfg"].get(k)) for e in entries}) > 1]
+    constant = [k for k in all_keys if k not in varying]
+    varying.sort(key=lambda k: (k == "epochs", k))
 
-    head = "| run | lr | batch | epochs | final_val_loss | final_val_acc | best_val_loss | best_val_acc | time_s |"
-    sep = "|" + "|".join(["---"] * 9) + "|"
+    valid = [e for e in entries if e["best_val_loss"] == e["best_val_loss"]]
+    best_stamp = min(valid, key=lambda e: e["best_val_loss"])["run"] if valid else None
+
+    metric_cols = ["epochs", "final_val_loss", "final_val_acc",
+                   "best_val_loss", "best_val_acc", "time_s"]
+    head_cols = ["run", *varying, *metric_cols]
+    head = "| " + " | ".join(head_cols) + " |"
+    sep = "|" + "|".join(["---"] * len(head_cols)) + "|"
+    def fmt_metric(c: str, e: dict) -> str:
+        v = e[c]
+        if c == "time_s":
+            return f"{v:.1f}"
+        return f"{v:.4f}" if isinstance(v, float) else str(v)
+
     body = []
-    for r in rows_out:
-        mark = " **← best**" if r["run"] == best_stamp else ""
-        body.append(
-            f"| {r['run']}{mark} | {r['lr']} | {r['batch']} | {r['epochs']} "
-            f"| {r['final_val_loss']:.4f} | {r['final_val_acc']:.4f} "
-            f"| {r['best_val_loss']:.4f} | {r['best_val_acc']:.4f} | {r['time_s']} |"
-        )
+    for e in entries:
+        row = [e["run"]]
+        row += [str(e["cfg"].get(k, "?")) for k in varying]
+        row += [fmt_metric(c, e) for c in metric_cols]
+        if e["run"] == best_stamp:
+            row[0] += " **← best**"
+        body.append("| " + " | ".join(row) + " |")
+
     notes = header_notes(algo)
+    if constant:
+        fixed_line = ("所有 run 固定: " + ", ".join(f"{k}={entries[0]['cfg'][k]}" for k in constant))
+    else:
+        fixed_line = "（各 run 无固定参数）"
     text = "\n".join([
         f"# {algo} · runs 对比",
         "",
@@ -254,8 +281,10 @@ def make_compare_report(algo: str, stamps: list[str]) -> Path:
         "## 汇总（按时间排序）",
         "",
         head, sep, *body, "",
-        "- 对比读法：best_val_loss 越低越好；final 与 best 差距大 = 训练尾段在退化（lr 太大或该早停）；",
-        "  同 best_val_loss 下 time_s 小者配置更划算。单次明细见同目录 `<stamp>.md`。",
+        f"- **只列出有差异的配置键**（{len(varying)} 个）；{fixed_line}",
+        "- 对比读法：先看差异列找原因，再看指标列定优劣；best_val_loss 越低越好，",
+        "  final 与 best 差距大 = 训练尾段退化（lr 太大或该早停）；同指标下 time_s 小者更划算。",
+        "  单次明细见同目录 `<stamp>.md`。",
         "",
     ])
     out_dir = REPORTS / algo
