@@ -111,8 +111,8 @@ class MLPSpec(MiniSpec):
     datasets = load_data
     metrics = {"acc": accuracy}
     optimizer = SGDScratch                 # 手写版 SGD，lr 仍走 cfg.lr 可 override
-    config = {"epochs": 20, "lr": 0.01, "batch_size": 256,
-              "num_hiddens": 256, "dropout1": 0.0, "dropout2": 0.0,
+    config = {"epochs": 100, "lr": 0.02, "batch_size": 256,
+              "num_hiddens": 256, "dropout1": 0, "dropout2": 0,
               "patience": 0, "amp": False}
 
     def build_model(self, cfg):

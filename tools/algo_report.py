@@ -66,6 +66,24 @@ def load_config_from_log(log_path: Path) -> dict:
     return {}
 
 
+def load_meta_from_log(log_path: Path) -> dict:
+    """解析 infra 落盘的 [优化器] 与 [数据] 行（旧版 run 无此二行，返回空）。"""
+    out = {}
+    if not log_path.exists():
+        return out
+    text = log_path.read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"\[优化器\]\s*(\S+?)(?:\s*\|\s*lr=([\d.eE+-]+))?$",
+                  text, re.MULTILINE)
+    if m:
+        out["optimizer"] = m.group(1)
+        out["opt_lr"] = m.group(2)
+    m = re.search(r"\[数据\]\s*train=(\S+)\s+val=(\S+)\s+\|\s*batch_size=(\S+)\s+\|\s*batches/epoch=(\S+)", text)
+    if m:
+        out["data"] = {"train": m.group(1), "val": m.group(2),
+                       "batch_size": m.group(3), "batches": m.group(4)}
+    return out
+
+
 def flatten(d: dict, prefix: str = "") -> dict:
     out = {}
     for k, v in d.items():
@@ -130,6 +148,7 @@ def pick_cols(cols: list[str]) -> list[str]:
 def make_run_report(algo: str, stamp: str) -> Path:
     d = run_paths(algo, stamp)
     cfg_log = load_config_from_log(d / "train.log")
+    meta = load_meta_from_log(d / "train.log")
     cols, rows = load_history(d / "history.csv")
     show_cols = pick_cols(cols)
 
@@ -176,6 +195,13 @@ def make_run_report(algo: str, stamp: str) -> Path:
         tag = "过拟合信号" if gap > 0.1 else ("欠拟合信号" if float(final["train_loss"]) > float(final["val_loss"]) else "拟合均衡")
         lines.append(f"- train/val loss 差: {gap:+.4f}（{tag}，仅供参考）")
 
+    if meta.get("data"):
+        dd = meta["data"]
+        lines.append(f"- 数据: train={dd['train']} / val={dd['val']} | batch_size={dd['batch_size']} | {dd['batches']} batches/epoch")
+    if meta.get("optimizer"):
+        opt_lr = f" (lr={meta['opt_lr']})" if meta.get("opt_lr") else ""
+        lines.append(f"- 优化器: {meta['optimizer']}{opt_lr}")
+
     lines += [
         "",
         "## 超参",
@@ -217,6 +243,7 @@ def make_compare_report(algo: str, stamps: list[str]) -> Path:
         if not rows:
             continue
         cfg = flatten(load_config_from_log(d / "train.log"))
+        meta = load_meta_from_log(d / "train.log")
         final = rows[-1]
         bl = min(float(r["val_loss"]) for r in rows) if "val_loss" in cols else float("nan")
         ba = max(float(r["val_acc"]) for r in rows) if "val_acc" in cols else float("nan")
@@ -224,7 +251,9 @@ def make_compare_report(algo: str, stamps: list[str]) -> Path:
         fa = float(final.get("val_acc", "nan"))
         ts = sum(float(r.get("train_time_s") or 0) for r in rows)
         entries.append({
-            "run": s, "cfg": cfg, "epochs": len(rows),
+            "run": s, "cfg": cfg, "opt": meta.get("optimizer", "?"),
+            "data": meta.get("data", {}),
+            "epochs": len(rows),
             "final_val_loss": fl, "final_val_acc": fa,
             "best_val_loss": bl, "best_val_acc": ba, "time_s": round(ts, 1),
         })
@@ -248,7 +277,7 @@ def make_compare_report(algo: str, stamps: list[str]) -> Path:
 
     metric_cols = ["epochs", "final_val_loss", "final_val_acc",
                    "best_val_loss", "best_val_acc", "time_s"]
-    head_cols = ["run", *varying, *metric_cols]
+    head_cols = ["run", *varying, "opt", *metric_cols]
     head = "| " + " | ".join(head_cols) + " |"
     sep = "|" + "|".join(["---"] * len(head_cols)) + "|"
     def fmt_metric(c: str, e: dict) -> str:
@@ -261,6 +290,7 @@ def make_compare_report(algo: str, stamps: list[str]) -> Path:
     for e in entries:
         row = [e["run"]]
         row += [str(e["cfg"].get(k, "?")) for k in varying]
+        row.append(e["opt"])
         row += [fmt_metric(c, e) for c in metric_cols]
         if e["run"] == best_stamp:
             row[0] += " **← best**"

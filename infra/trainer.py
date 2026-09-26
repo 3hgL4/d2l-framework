@@ -116,6 +116,21 @@ class Trainer:
         self.scaler = torch.amp.GradScaler("cuda", enabled=cfg.amp and device.type == "cuda")
         train_dl, val_dl = spec.build_dataloaders(cfg)
 
+        # 数据与优化器落盘（INFO 双写 train.log）：报告/审计可溯源，不必翻代码
+        def _n(ds):
+            try:
+                return len(ds.dataset)
+            except (TypeError, AttributeError):
+                return "?"
+        opt_lr = getattr(self.optimizer, "lr", None)
+        if opt_lr is None and getattr(self.optimizer, "param_groups", None):
+            opt_lr = self.optimizer.param_groups[0].get("lr")
+        self.logger.info(f"[优化器] {type(self.optimizer).__name__}"
+                         + (f" | lr={opt_lr}" if opt_lr is not None else ""))
+        self.logger.info(f"[数据] train={_n(train_dl)} val={_n(val_dl) if val_dl else 0} "
+                         f"| batch_size={getattr(train_dl, 'batch_size', '?')} "
+                         f"| batches/epoch={len(train_dl)}")
+
         resume_epoch, extras = 0, {}
         if resume:
             payload = ckpt_mod.load(resume, map_location=str(device))
