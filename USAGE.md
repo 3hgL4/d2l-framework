@@ -127,6 +127,25 @@ python run.py --algo mlp --override epochs=3 num_workers=0
 # build_scheduler / get_callbacks 可选，duck-typing 无需继承（见 infra/contract.py）
 ```
 
+## 7.5 算法实验报告（tools/algo_report.py，结论层留痕）
+
+```bash
+# 最新一次 run → 单次报告 reports/<算法>/<时间戳>.md
+python tools/algo_report.py --algo mlp
+
+# 指定某次 run
+python tools/algo_report.py --algo mlp --run 20260922-200605
+
+# 该算法全部 runs 汇成对比表 → reports/<算法>/compare.md
+python tools/algo_report.py --algo mlp --compare
+```
+
+说明：
+- **报告内容**：algo.py 头部"我的实验笔记"注释块 + 关键指标（最终/best val_loss·val_acc、train/val loss 差及过拟合提示）+ 超参（算法自定义与 infra 分列）+ 训练历史表 + 日志尾部 + 曲线图链接；
+- **写笔记的位置**：`algorithms/<算法>/algo.py` 最顶部的连续 `#` 注释块（模板：目标/假设/结论），报告自动原样收录——假设在跑之前写，结论跑完回填；
+- **compare 表为动态列**：只列出各 run 之间取值有差异的配置键（差异原因候选），完全相同的参数折成一行"所有 run 固定: ..."；早期 run 缺某键显示 `?`；
+- 报告可随时再生成（纯读 runs/ 产物），故 `reports/` 不入库；不 import torch，任何 Python ≥3.10 可跑。
+
 ## 8. 冒烟测试（全量回归，改 infra 后必跑）
 
 ```bash
