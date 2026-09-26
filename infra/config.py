@@ -11,6 +11,7 @@ from __future__ import annotations
 import platform
 import sys
 import time
+import warnings
 from pathlib import Path
 
 import yaml
@@ -110,9 +111,35 @@ def parse_overrides(items) -> dict:
     return out
 
 
+def _unknown_paths(known: dict, override: dict, prefix: str = "") -> list:
+    """递归找 override 中"已知配置树里不存在"的键，返回点号路径。
+
+    类型安全（fail-fast）：拼错的 override 键（如 epohs=5）会静默新增死键，
+    对应功能（如早停）默默失效——宁可告警，不可静默错。
+    """
+    out = []
+    for k, v in (override or {}).items():
+        path = f"{prefix}{k}"
+        if k not in known:
+            out.append(path)
+        elif isinstance(v, dict):
+            kv = known[k]
+            if isinstance(kv, dict):
+                out += _unknown_paths(kv, v, path + ".")
+            else:  # dict 覆盖标量（如 epochs.a=5）：结构冲突同样可疑
+                out.append(path)
+    return out
+
+
 def build_config(algo_defaults: dict, cli: dict | None) -> AttrDict:
-    cfg = deep_merge(INFRA_DEFAULTS, algo_defaults or {})
-    cfg = deep_merge(cfg, cli or {})
+    merged = deep_merge(INFRA_DEFAULTS, algo_defaults or {})
+    unknown = _unknown_paths(merged, cli or {})
+    if unknown:
+        warnings.warn(
+            f"未知配置键 {unknown}（不在 infra 默认或算法 default_config 中，"
+            f"请检查拼写；默认值只活在 default_config，新键应加在那里）",
+            stacklevel=2)
+    cfg = deep_merge(merged, cli or {})
     return AttrDict(cfg)
 
 

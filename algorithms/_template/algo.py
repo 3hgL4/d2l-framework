@@ -51,7 +51,7 @@ if str(ROOT) not in sys.path:
 
 from infra.minispec import MiniSpec
 
-DATA_ROOT = ROOT.parent / "data"             # 与其他算法共用同一数据目录
+DATA_ROOT = ROOT / "data"                    # 数据目录 d2l/data（2026-09-22 统一）
 
 
 # ── ② 模型：从零实现（每个算法唯一的大块，d2l 对应章节抄这里）──────

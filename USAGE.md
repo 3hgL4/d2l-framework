@@ -18,6 +18,30 @@ python run.py --algo softmax --override viz.live=False ckpt.save_best=False
 python run.py --algo linreg
 ```
 
+## 1.5 参数扫描 / 多 seed（批量实验）
+
+```bash
+# 扫描 lr 两个取值（每值一次完整训练，各自独立 run 目录）
+python run.py --algo mlp --sweep lr=0.01,0.1
+
+# 多参数 = 笛卡尔积（2 lr × 2 batch_size = 4 次）
+python run.py --algo mlp --sweep lr=0.01,0.1 batch_size=128,256
+
+# 每个组合再连跑 3 个 seed（42/43/44），共 12 次
+python run.py --algo mlp --sweep lr=0.01,0.1 --seeds 3
+
+# 扫描可与 --override 叠加（扫描值优先）
+python run.py --algo mlp --sweep lr=0.01,0.1 --override epochs=30 patience=5
+
+# 只做多 seed 重复（同一配置跑 5 次，看方差）
+python run.py --algo softmax --seeds 5
+```
+
+说明：
+- 索引落 `runs/<算法>/sweeps/<时间戳>.csv`（组合、seed、run_dir、最优值、实际轮数、耗时），结束打印按最优值排名；
+- 扫描模式强制 `viz.live=False / wait_close=False`（否则 N 个窗口弹出）；看曲线请对感兴趣的 run_dir 单跑或续训；
+- `--sweep/--seeds` 与 `--resume` 互斥。
+
 ## 2. 断点续训
 
 ```bash
@@ -111,6 +135,9 @@ python tests/smoke_2_history_ckpt_callbacks.py # 早停触发 / 断点状态等�
 python tests/smoke_3_full_flow.py              # 全流程 + spawn 多进程 + infra 红线检查
 python tests/smoke_4_softmax.py                # 真实算法接入 + 续训 + 预测图（softmax 从零实现）
 python tests/smoke_5_minispec.py               # MiniSpec 声明式契约正确性（校验/配置/优化器/损失/装载）
+python tests/smoke_6_custom_step.py            # training_step 接管 + 契约版本化告警
+python tests/smoke_7_config_units.py           # config 纯函数边界 + 多源 RNG 恢复（单元级）
+python tests/smoke_8_lenet.py                  # LeNet 全组件从零：gradcheck 数值对拍 + 训练/续训
 ```
 
 ## 9. 产物说明（每次运行自动生成）

@@ -11,3 +11,10 @@ venv/
 .vscode/
 Thumbs.db
 .DS_Store
+
+# 数据集（可下载/可再生，不入库）
+data/
+# Jupyter 临时检查点
+.ipynb_checkpoints/
+# linreg 留给学习者练习（README 已声明，完成后可移除此行入库）
+algorithms/linreg/

@@ -13,6 +13,7 @@
               允许算法全权接管单批优化）
   minispec    声明式算法基类（AlgoSpec 糖衣：只声明算法知识，工程代劳）
   data        DataLoader 工厂（Windows 多进程安全）
+  datasets    IDX 手写解析 + FashionMNIST 装载（数据集级复用件）
   evaluator   验证集评估执行器
   viz         训练曲线实时刷新与存盘
   trainer     通用训练循环（checkpoint 记录 contract_version，续训跨版本告警）

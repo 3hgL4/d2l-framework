@@ -22,7 +22,7 @@ if str(ROOT) not in sys.path:
 from infra.callbacks import Callback
 from infra.minispec import MiniSpec
 
-DATA_ROOT = ROOT.parent / "data"
+DATA_ROOT = ROOT / "data"    # 数据在 d2l/data/FashionMNIST/raw（2026-09-22 统一）
 
 
 # ---------------------------------------------------------------------------
