@@ -122,6 +122,14 @@ class Trainer:
                 return len(ds.dataset)
             except (TypeError, AttributeError):
                 return "?"
+        def _sig(dl):
+            """数据集类名 + 单样本输入形状（索引一条，不消耗迭代器/RNG）。"""
+            try:
+                ds = dl.dataset
+                shape = tuple(ds[0][0].shape) if not torch.is_tensor(ds[0]) else tuple(ds[0].shape)
+                return f"{type(ds).__name__}{shape}"
+            except Exception:
+                return "?"
         opt_lr = getattr(self.optimizer, "lr", None)
         if opt_lr is None and getattr(self.optimizer, "param_groups", None):
             opt_lr = self.optimizer.param_groups[0].get("lr")
@@ -129,7 +137,7 @@ class Trainer:
                          + (f" | lr={opt_lr}" if opt_lr is not None else ""))
         self.logger.info(f"[数据] train={_n(train_dl)} val={_n(val_dl) if val_dl else 0} "
                          f"| batch_size={getattr(train_dl, 'batch_size', '?')} "
-                         f"| batches/epoch={len(train_dl)}")
+                         f"| batches/epoch={len(train_dl)} | dataset={_sig(train_dl)}")
 
         resume_epoch, extras = 0, {}
         if resume:

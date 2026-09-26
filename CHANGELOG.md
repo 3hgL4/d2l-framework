@@ -57,3 +57,5 @@
 - 2026-09-26 | .gitignore 补 reports/；algorithms/mlp/algo.py 头部加注释模板（目标/假设/结论占位，内容待用户填） | 报告为可再生工件；模板示范 header 注释块的收录机制
 - 2026-09-26 | infra/trainer.py：fit() 组装 optimizer/dataloader 后新增 [优化器]（类名+lr）与 [数据]（train/val 样本数、batch_size、batches/epoch）两行 INFO，双写 train.log | 报告与审计需要优化器型号与数据规模溯源——此前 config 只记 lr 无优化器类名，数据规模完全未落盘；契约零改动，全量冒烟 1–8 回归通过（conda ai 环境，1m39s）
 - 2026-09-26 | tools/algo_report.py：单次报告收录数据规模与优化器行；compare 表新增 opt 列（2026-09-26 15:00 前的旧 run 无该日志行，显示 ?） | 与 infra 新日志行配套
+- 2026-09-26 | infra/trainer.py：[数据] 行补 dataset=<类名>(<样本形状>)（索引一条样本取形状，不消耗迭代器/RNG，不影响复现语义） | 数据集身份是报告的静态背景信息且一般不变；契约零改动，全量冒烟 1–8 回归通过
+- 2026-09-26 | tools/algo_report.py：单次报告数据行收录数据集签名；compare 固定参数行追加"数据集: ..."（全部 run 一致时） | 与 infra 配套

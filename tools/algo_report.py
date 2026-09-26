@@ -77,10 +77,12 @@ def load_meta_from_log(log_path: Path) -> dict:
     if m:
         out["optimizer"] = m.group(1)
         out["opt_lr"] = m.group(2)
-    m = re.search(r"\[数据\]\s*train=(\S+)\s+val=(\S+)\s+\|\s*batch_size=(\S+)\s+\|\s*batches/epoch=(\S+)", text)
+    m = re.search(r"\[数据\]\s*train=(\S+)\s+val=(\S+)\s+\|\s*batch_size=(\S+)\s+\|\s*batches/epoch=(\S+)"
+                  r"(?:\s+\|\s*dataset=(.+))?", text)
     if m:
         out["data"] = {"train": m.group(1), "val": m.group(2),
-                       "batch_size": m.group(3), "batches": m.group(4)}
+                       "batch_size": m.group(3), "batches": m.group(4),
+                       "dataset": (m.group(5) or "").strip() or "?"}
     return out
 
 
@@ -197,7 +199,8 @@ def make_run_report(algo: str, stamp: str) -> Path:
 
     if meta.get("data"):
         dd = meta["data"]
-        lines.append(f"- 数据: train={dd['train']} / val={dd['val']} | batch_size={dd['batch_size']} | {dd['batches']} batches/epoch")
+        ds_part = f" | 数据集: {dd['dataset']}" if dd.get("dataset", "?") != "?" else ""
+        lines.append(f"- 数据: train={dd['train']} / val={dd['val']} | batch_size={dd['batch_size']} | {dd['batches']} batches/epoch{ds_part}")
     if meta.get("optimizer"):
         opt_lr = f" (lr={meta['opt_lr']})" if meta.get("opt_lr") else ""
         lines.append(f"- 优化器: {meta['optimizer']}{opt_lr}")
@@ -301,6 +304,9 @@ def make_compare_report(algo: str, stamps: list[str]) -> Path:
         fixed_line = ("所有 run 固定: " + ", ".join(f"{k}={entries[0]['cfg'][k]}" for k in constant))
     else:
         fixed_line = "（各 run 无固定参数）"
+    data_sigs = {e["data"]["dataset"] for e in entries if e.get("data") and e["data"].get("dataset", "?") != "?"}
+    if len(data_sigs) == 1:
+        fixed_line += f"；数据集: {data_sigs.pop()}"
     text = "\n".join([
         f"# {algo} · runs 对比",
         "",
